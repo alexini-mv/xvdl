@@ -1,0 +1,24 @@
+version: 1
+disable_existing_loggers: true
+
+formatters:
+  standard:
+    format: "{asctime} [{levelname}] {message}"
+    datefmt: "%Y-%m-%d %H:%M:%S"
+    style: "{"
+
+handlers:
+  console:
+    class: logging.StreamHandler
+    formatter: standard
+    stream  : ext://sys.stdout
+
+  file:
+    filename: log_xvdl.log
+    class: logging.FileHandler
+    formatter: standard  
+
+loggers:
+  xvdl:
+    level: DEBUG
+    handlers: [console, file]

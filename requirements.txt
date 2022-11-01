@@ -1,0 +1,6 @@
+beautifulsoup4
+ffmpeg-python
+requests
+typer[all]
+pyyaml
+
