@@ -1,2 +1,2 @@
 # xvdl
-Experiment CLI python
+Experiment CLI python for collect infomation video.

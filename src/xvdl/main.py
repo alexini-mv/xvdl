@@ -8,15 +8,26 @@ import typer
 from tqdm.auto import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
 
-from utils import logger
-from utils import (get_video_name, get_video_id, get_url_hls,
-                   get_second_hls, download_m3u8, get_a_proxy)
+from xvdl import __version__
+from xvdl.utils import logger
+from xvdl.utils import (get_video_name, get_video_id, get_url_hls,
+                        get_second_hls, download_m3u8, get_a_proxy)
 
 
 # Instanciamos el manejador del CLI
 app = typer.Typer(name="xvdl",
                   help="CLI to download videos.",
                   add_completion=True)
+
+
+def callback_version(ctx: typer.Context, value: bool):
+    """Print the version of this package."""
+    if ctx.resilient_parsing:
+        return
+
+    if value:
+        print(f"Version: {__version__}")
+        typer.Exit()
 
 
 # Definimos el comando del CLI, así como los argumentos del comando
@@ -34,20 +45,27 @@ def main(urls: List[str] = typer.Argument(None,
                                              "-f",
                                              "--file-urls",
                                              help="File text with urls.",
-                                             show_default=None,
+                                             show_default=False,
                                              rich_help_panel="CLI Options"),
          overwrite: bool = typer.Option(False,
                                         "-w",
                                         "--overwrite",
                                         help="Overwrite the exist video files.",
-                                        show_default=None,
+                                        show_default=False,
                                         rich_help_panel="CLI Options"),
          proxies: typer.FileText = typer.Option(None,
                                                 "-p",
                                                 "--proxies-file",
                                                 help="File text with proxies urls.",
-                                                show_default=None,
-                                                rich_help_panel="CLI Options")
+                                                show_default=False,
+                                                rich_help_panel="CLI Options"),
+         version: bool = typer.Option(False,
+                                      "-v",
+                                      "--version",
+                                      help="Return the version of xvdl package.",
+                                      show_default=False,
+                                      callback=callback_version,
+                                      is_eager=True)
          ):
     # Hamos que la salida del logger se redirija al writer de tqdm
     with logging_redirect_tqdm(loggers=[logger]):
@@ -70,7 +88,8 @@ def main(urls: List[str] = typer.Argument(None,
         videos_names = " ".join(videos_names)
 
         # Personalizamos los headers de la petición
-        headers = {'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36'}
+        headers = {
+            'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36'}
 
         # Verificamos si se pasó un archivo de direcciones proxies
         if proxies:
@@ -90,7 +109,7 @@ def main(urls: List[str] = typer.Argument(None,
                 logger.info(f"Requests with proxy url: {proxy['http']}")
 
                 response = requests.get(url, headers=headers, proxies=proxy)
-                
+
                 # Verificamos el estatus de la respuesta
                 if response.status_code != 200:
                     logger.error("An error occurred during the request.")
