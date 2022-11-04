@@ -5,13 +5,14 @@ from pathlib import Path
 from typing import List, Optional
 
 import typer
+from rich import print
 from tqdm.auto import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
 
 from xvdl import __version__
-from xvdl.utils import logger
-from xvdl.utils import (get_video_name, get_video_id, get_url_hls,
-                        get_second_hls, download_m3u8, get_a_proxy)
+from .utils import logger
+from .utils import (get_video_name, get_video_id, get_url_hls, get_second_hls,
+                    download_m3u8, get_a_proxy, get_info_video)
 
 
 # Instanciamos el manejador del CLI
@@ -26,8 +27,8 @@ def callback_version(ctx: typer.Context, value: bool):
         return
 
     if value:
-        print(f"Version: {__version__}")
-        typer.Exit()
+        print(f"[cyan bold]Version:[/] [yellow bold]{__version__}[/]")
+        raise typer.Exit()
 
 
 # Definimos el comando del CLI, así como los argumentos del comando
@@ -65,7 +66,8 @@ def main(urls: List[str] = typer.Argument(None,
                                       help="Return the version of xvdl package.",
                                       show_default=False,
                                       callback=callback_version,
-                                      is_eager=True)
+                                      is_eager=True,
+                                      rich_help_panel="CLI Options")
          ):
     # Hamos que la salida del logger se redirija al writer de tqdm
     with logging_redirect_tqdm(loggers=[logger]):
@@ -103,10 +105,14 @@ def main(urls: List[str] = typer.Argument(None,
             logger.info(f"{idx}/{len(urls)}: {url}")
 
             # Verificamos que el video no ha sido descargado antes.
-            if not video_id in videos_names:
+            if not video_id in videos_names or overwrite:
                 # Hacemos la petición GET a la url.
                 proxy = get_a_proxy(proxies)
-                logger.info(f"Requests with proxy url: {proxy['http']}")
+                if proxy:
+                    logger.info(
+                        f"First request with proxy url: {proxy['http']}")
+                else:
+                    logger.warning(f"Requests without proxy url")
 
                 response = requests.get(url, headers=headers, proxies=proxy)
 
@@ -123,11 +129,16 @@ def main(urls: List[str] = typer.Argument(None,
                 logger.info(f"File name: {name_video}{video_id}.mp4")
 
                 # Hacemos la petición a la url del m3u8 para obtener las resoluciones
-                first_hls_response = requests.get(first_url_hls)
+                proxy = get_a_proxy(proxies)
+                if proxy:
+                    logger.info(
+                        f"Second request with proxy url: {proxy['http']}")
+
+                first_hls_response = requests.get(first_url_hls, proxies=proxy)
 
                 # Obtenemos la mejor resolución de video y el nombre del
                 # archivo m3u8
-                resolution, sufix = get_second_hls(
+                sufix = get_second_hls(
                     response=first_hls_response.text)
 
                 # Construimos la segunda url del archivo m3u8 verdadero para
@@ -140,14 +151,15 @@ def main(urls: List[str] = typer.Argument(None,
                                   name_dir=name_dir,
                                   name_video=name_video,
                                   video_id=video_id,
-                                  overwrite=overwrite,
-                                  resolution=resolution)
+                                  overwrite=overwrite)
                 except:
                     logger.exception(
                         "An error occurred while downloading file.")
             else:
                 # Si el video ya ha sido descargado antes, se salta esa url
-                logger.warning(f"SKIP! {video_id} was already downloaded.\n")
+                filename = list(name_dir.glob(f"*{video_id}*"))[0]
+                logger.warning(f"SKIP! {filename} was already downloaded.")
+                logger.info(get_info_video(filename))
                 time.sleep(0.1)
 
         logger.info("Finish to run!!!\n")

@@ -4,7 +4,7 @@ build-backend = "flit_core.buildapi"
 
 [project]
 name = "xvdl"
-version = "0.0.1"
+version = "0.1.0"
 authors = [
   { name = "Alejandro Martínez-Valencia", email = "vaf.ss4@gmail.com" },
 ]
@@ -33,4 +33,4 @@ dependencies = [
 "Bug Tracker" = "https://github.com/alexini-mv/xvdl"
 
 [project.scripts]
-xvdl = "main:app"
+xvdl = "xvdl.main:app"

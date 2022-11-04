@@ -1,10 +1,12 @@
 import logging
 import logging.config
-from pathlib import Path
 import yaml
+from pathlib import Path
 
-def setup_logger(config_path='configLog.yaml', default_level=logging.INFO):
+def setup_logger(config_file='configLog.yaml', default_level=logging.INFO):
     """Cargamos la configuración para el logger"""
+    config_path = Path(__file__).parent / config_file
+    
     if Path(config_path).exists():
 
         with open(config_path, 'r') as f:
@@ -19,7 +21,7 @@ def setup_logger(config_path='configLog.yaml', default_level=logging.INFO):
                 print(e)
                 print('Error in Logging Configuration. Using default configs')
                 logging.basicConfig(level=default_level)
-                
+
     else:
         logging.basicConfig(level=default_level)
         print('Failed to load configuration file. Using default configs')

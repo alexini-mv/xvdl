@@ -6,7 +6,7 @@ from typing import Tuple, List, Dict
 import ffmpeg
 from bs4 import BeautifulSoup
 
-from configlogger import setup_logger
+from .configlogger import setup_logger
 logger = setup_logger()
 
 
@@ -72,7 +72,7 @@ def get_resolution(string: str) -> str:
                                 text=string))
 
 
-def get_second_hls(response: str) -> Tuple[str, str]:
+def get_second_hls(response: str) -> str:
     """Buscamos el nombre del archivo .m3u8 para descargar el video con 
     mejor resolución"""
     items_raw = [item for item in response.split("\n") if ".m3u8" in item]
@@ -83,38 +83,41 @@ def get_second_hls(response: str) -> Tuple[str, str]:
 
     items_list.sort(reverse=True)
     # Seleccionamos el item con mejor resolución
-    return items_list[0]
+    return items_list[0][1]
 
+def get_info_video(filename: Path) -> str:
+    video_resolution = ffmpeg.probe(filename)["streams"][0]["height"]
+    video_size = filename.stat().st_size / 1024 ** 2
+    return f"Video Resolution: {video_resolution}p\tVideo Size : {video_size:.2f} MB\n"
 
 def download_m3u8(url_m3u8: str, name_dir: Path, name_video: str,
-                  video_id: str, overwrite: bool = False,
-                  resolution: str = None) -> None:
+                  video_id: str, overwrite: bool = False) -> None:
     """Descargamos el video a partir del archivo m3u8 con la mejor resolución"""
     # Construimos la ruta donde se guardará el video descargado
     filename = name_dir / f"{name_video}{video_id}.mp4"
 
     # Verificamos si el archivo no existe para descargarlo
-    if not filename.exists():
-        logger.info(f"Download video: {str(filename.absolute())}")
+    if not filename.exists() or overwrite:
+        logger.info(f"Download video: {str(filename)}")
         # Definimos la tarea de descarga mediante ffmpeg
         stream = ffmpeg.input(url_m3u8).output(str(filename.absolute()),
                                                codec="copy",
                                                loglevel="quiet")
         try:
+            # Si el archivo existe, y además queremos sobreescribirlo.
+            if filename.exists() and overwrite:
+                logger.warning(f"Overwrite: {str(filename)}")
+            
             # Intentamos ejecutar la tarea de descarga
-            stream.run(capture_stderr=True)
+            stream.run(capture_stderr=True, overwrite_output=overwrite)
+
         except ffmpeg._run.Error as e:
             # Si existe un error, lo imprime en pantalla
             print(f"STDOUT:\t{e.stdout}")
             print(f"STDERR:\t{e.stderr}")
-    elif overwrite:
-        # Si el archivo existe, y además queremos sobreescribirlo.
-        logger.info(f"Overwrite: {str(filename.absolute())}")
-        stream.run(overwrite_output=overwrite)
     else:
         # Si existe el archivo y no queremos sobreescribirlo, lo saltamos
         logger.warning(f"SKIP! {filename} was already downloaded.")
 
     # Imprimimos la resolución y el tamaño del archivo
-    logger.info(
-        f"Video Resolution: {resolution}p. \tVideo Size : {filename.stat().st_size / 1024 ** 2:.2f} MB.\n")
+    logger.info(get_info_video(filename))
