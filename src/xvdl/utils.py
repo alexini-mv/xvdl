@@ -1,12 +1,21 @@
 import re
+from random import choice
 from pathlib import Path
-from typing import Tuple
+from typing import Tuple, List, Dict
 
 import ffmpeg
 from bs4 import BeautifulSoup
 
 from configlogger import setup_logger
 logger = setup_logger()
+
+
+def get_a_proxy(proxies: List[str] | None) -> Dict[str, str] | None:
+    if proxies:
+        url = choice(proxies)
+        return {"http": url}
+    else:
+        return None
 
 
 def find_from_string(pattern: str, text: str) -> str:
@@ -16,6 +25,7 @@ def find_from_string(pattern: str, text: str) -> str:
     if find:
         return find.group()
     else:
+        logger.error(f"Pattern not found in response.")
         raise ValueError(f"Pattern not found in response.")
 
 
@@ -24,10 +34,13 @@ def get_video_name(response_text: str) -> str:
     response de la petición GET de la url"""
     s = BeautifulSoup(response_text, "html.parser")
     elements = s.find('div', class_=re.compile('video-tags-list'))
-    channel = elements.find('a', class_=re.compile('label main'))
+    channel = elements.find('a', class_=re.compile('label main')
+                            ).find('span', class_=re.compile('name'))
     pstars = elements.find_all('a', class_=re.compile('label profile'))
 
     if pstars:
+        pstars = map(lambda x: x.find('span', class_=re.compile('name')),
+                     pstars)
         video_name = ""
         for star in pstars:
             video_name += f"{star.text.replace(' ', '_')}-"
@@ -103,4 +116,5 @@ def download_m3u8(url_m3u8: str, name_dir: Path, name_video: str,
         logger.warning(f"SKIP! {filename} was already downloaded.")
 
     # Imprimimos la resolución y el tamaño del archivo
-    logger.info(f"Video Resolution: {resolution}p. \tVideo Size : {filename.stat().st_size / 1024 ** 2:.2f} MB.\n")
+    logger.info(
+        f"Video Resolution: {resolution}p. \tVideo Size : {filename.stat().st_size / 1024 ** 2:.2f} MB.\n")

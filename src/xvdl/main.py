@@ -9,8 +9,8 @@ from tqdm.auto import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
 
 from utils import logger
-from utils import (get_video_name, get_video_id,
-                   get_url_hls, get_second_hls, download_m3u8)
+from utils import (get_video_name, get_video_id, get_url_hls,
+                   get_second_hls, download_m3u8, get_a_proxy)
 
 
 # Instanciamos el manejador del CLI
@@ -25,7 +25,7 @@ app = typer.Typer(name="xvdl",
 def main(urls: List[str] = typer.Argument(None,
                                           help="URLs to download.",
                                           show_default=False),
-         name_dir: Optional[Path] = typer.Option("xvideos/",
+         name_dir: Optional[Path] = typer.Option("xvdl/",
                                                  "-d",
                                                  "--destination",
                                                  help="Destination to save the downloaded videos.",
@@ -41,7 +41,13 @@ def main(urls: List[str] = typer.Argument(None,
                                         "--overwrite",
                                         help="Overwrite the exist video files.",
                                         show_default=None,
-                                        rich_help_panel="CLI Options")
+                                        rich_help_panel="CLI Options"),
+         proxies: typer.FileText = typer.Option(None,
+                                                "-p",
+                                                "--proxies-file",
+                                                help="File text with proxies urls.",
+                                                show_default=None,
+                                                rich_help_panel="CLI Options")
          ):
     # Hamos que la salida del logger se redirija al writer de tqdm
     with logging_redirect_tqdm(loggers=[logger]):
@@ -63,27 +69,41 @@ def main(urls: List[str] = typer.Argument(None,
         videos_names = map(lambda x: x.name, name_dir.glob("*"))
         videos_names = " ".join(videos_names)
 
+        # Personalizamos los headers de la petición
+        headers = {'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36'}
+
+        # Verificamos si se pasó un archivo de direcciones proxies
+        if proxies:
+            proxies = list(map(lambda x: x.strip(), proxies.readlines()))
+
         # Iteramos sobre toda la lista de urls
         for idx, url in enumerate(tqdm(urls, colour="green"), start=1):
             # Obtenemos el id del video a partir de la url
             video_id = get_video_id(url)
 
-            logger.info(f"Request to {idx}/{len(urls)}: {url}")
+            logger.info(f"{idx}/{len(urls)}: {url}")
 
             # Verificamos que el video no ha sido descargado antes.
             if not video_id in videos_names:
                 # Hacemos la petición GET a la url.
-                # ========== Falta implementar el proxy aleatorio!!! ==========
-                response = requests.get(url)
+                proxy = get_a_proxy(proxies)
+                logger.info(f"Requests with proxy url: {proxy['http']}")
+
+                response = requests.get(url, headers=headers, proxies=proxy)
+                
+                # Verificamos el estatus de la respuesta
+                if response.status_code != 200:
+                    logger.error("An error occurred during the request.")
 
                 # Construimos el nombre del video que se descargará
                 name_video = get_video_name(response.text)
+
                 # Obtenemos la url del primer archivo m3u8
                 first_url_hls = get_url_hls(response.text)
 
                 logger.info(f"File name: {name_video}{video_id}.mp4")
-                # Hacemos la petición a la url del m3u8 para obtener la
-                # resoluciones,
+
+                # Hacemos la petición a la url del m3u8 para obtener las resoluciones
                 first_hls_response = requests.get(first_url_hls)
 
                 # Obtenemos la mejor resolución de video y el nombre del
@@ -91,7 +111,7 @@ def main(urls: List[str] = typer.Argument(None,
                 resolution, sufix = get_second_hls(
                     response=first_hls_response.text)
 
-                # Construimos la segunda url del archivo verdadero para
+                # Construimos la segunda url del archivo m3u8 verdadero para
                 # descargar el video
                 second_url_hls = re.sub(r"hls.m3u8.*", sufix, first_url_hls)
 
