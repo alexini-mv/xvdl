@@ -1,7 +1,7 @@
 import re
 from random import choice
 from pathlib import Path
-from typing import Tuple, List, Dict
+from typing import List, Dict, Union
 
 import ffmpeg
 from bs4 import BeautifulSoup
@@ -10,7 +10,7 @@ from .configlogger import setup_logger
 logger = setup_logger()
 
 
-def get_a_proxy(proxies: List[str] | None) -> Dict[str, str] | None:
+def get_a_proxy(proxies: Union[List[str], None]) -> Union[Dict[str, str], None]:
     if proxies:
         url = choice(proxies)
         return {"http": url}
