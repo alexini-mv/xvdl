@@ -69,7 +69,7 @@ def main(urls: List[str] = typer.Argument(None,
                                       is_eager=True,
                                       rich_help_panel="CLI Options")
          ):
-    # Hamos que la salida del logger se redirija al writer de tqdm
+    # Hacemos que la salida del logger se redirija al writer de tqdm
     with logging_redirect_tqdm(loggers=[logger]):
         logger.info("Start new run!!!")
 
